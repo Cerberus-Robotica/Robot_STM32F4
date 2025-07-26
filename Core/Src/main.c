@@ -40,7 +40,7 @@ typedef struct {
 } Pacote;
 #pragma pack(pop)
 
-const uint8_t id = 0;
+const uint8_t id = 1;
 volatile float vx = 0;
 volatile float vy = 0;
 volatile float vang = 0;
@@ -210,9 +210,9 @@ void acionar_motor(int motor, float dutycycle){
 	uint32_t frequencia = (uint32_t)((dutycycle / 100.0f) * (ARR));
 	__HAL_TIM_SET_COMPARE(htim, channel, frequencia);
 
-	char msg[32];
-	snprintf(msg, sizeof(msg), "%d %f %d\r\n", motor, dutycycle, sentido);
-	HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
+	//char msg[32];
+	//snprintf(msg, sizeof(msg), "%d %f %d\r\n", motor, dutycycle, sentido);
+	//HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
 }
 /* USER CODE END 0 */
 
@@ -305,7 +305,7 @@ int main(void)
   	  	    {-sin(a3), cos(a3), R},
   	  	    {-sin(a4), cos(a4), R}
   	  	  };
-
+  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -320,11 +320,11 @@ int main(void)
 	  	  }
 
 	  if(nrf24_data_available()) {
-		  	  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
 		  	  nrf24_receive(rx_buffer, pld_size);
 		  	  memcpy(&pacote_recebido, rx_buffer, sizeof(Pacote));
 		  	  if(pacote_recebido.id == id){
-		  		  snprintf(msg, sizeof(msg), "%d %.2f %.2f %.2f %d\r\n", pacote_recebido.id, pacote_recebido.Vx, pacote_recebido.Vy,pacote_recebido.Vang,pacote_recebido.kicker);
+		  		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
+		  		  snprintf(msg, sizeof(msg), "Radio: %d %.2f %.2f %.2f %d\r\n", pacote_recebido.id, pacote_recebido.Vx, pacote_recebido.Vy,pacote_recebido.Vang,pacote_recebido.kicker);
 		  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
 		  	  	  vx = pacote_recebido.Vx;
 		  	  	  vy = pacote_recebido.Vy;
@@ -333,7 +333,6 @@ int main(void)
 		  	  	  radio_timeout = 1;
 		  	  }
 	  } else HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
-
 	  if(kicker  > 8 && kicker < 12){
 		  HAL_Delay(4000);
 		  for(int i = 0; i<4; i++){
@@ -348,15 +347,22 @@ int main(void)
 		  continue;
 	  }
 	  if(kicker > 18 && kicker < 22){
-	  		  for(int i = 0; i<11; i++){
+		  	for(int i = 0; i<11; i++){
 	  			  acionar_motor(1, i*10);
 	  			  acionar_motor(2, i*10);
 	  			  acionar_motor(3, i*10);
 	  			  acionar_motor(4, i*10);
 	  			  HAL_Delay(2000);
-	  		  }
-	  		  continue;
-	  	  }
+	  		}
+	  		for(int i = 0; i<11; i++){
+	  			  acionar_motor(1, -i*10);
+	  			  acionar_motor(2, -i*10);
+	  			  acionar_motor(3, -i*10);
+	  			  acionar_motor(4, -i*10);
+	  			  HAL_Delay(2000);
+	  		}
+	  		continue;
+	  }
 
 	  float duty_cycle[4];
 	  for (int i = 0; i < 4; i++) {
