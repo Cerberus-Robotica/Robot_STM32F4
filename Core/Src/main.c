@@ -40,7 +40,7 @@ typedef struct {
 } Pacote;
 #pragma pack(pop)
 
-const uint8_t id = 1;
+const uint8_t id = 5;
 volatile float vx = 0;
 volatile float vy = 0;
 volatile float vang = 0;
@@ -74,14 +74,14 @@ const float a4 = 5.49779;  // 315°
 #define PWM_MOTOR1_CHANNEL TIM_CHANNEL_1
 #define PWM_MOTOR1_TIMER &htim1
 
-#define PWM_MOTOR2_CHANNEL TIM_CHANNEL_1
-#define PWM_MOTOR2_TIMER &htim2
+#define PWM_MOTOR2_CHANNEL TIM_CHANNEL_2
+#define PWM_MOTOR2_TIMER &htim3
 
-#define PWM_MOTOR3_CHANNEL TIM_CHANNEL_2
+#define PWM_MOTOR3_CHANNEL TIM_CHANNEL_1
 #define PWM_MOTOR3_TIMER &htim3
 
 #define PWM_MOTOR4_CHANNEL TIM_CHANNEL_1
-#define PWM_MOTOR4_TIMER &htim3
+#define PWM_MOTOR4_TIMER &htim2
 
 /* USER CODE END PD */
 
@@ -306,6 +306,7 @@ int main(void)
   	  	    {-sin(a4), cos(a4), R}
   	  	  };
   HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+  HAL_UART_Transmit(&huart2, (uint8_t*)"Iniciado!", strlen("Iniciado!"), 100);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -313,17 +314,16 @@ int main(void)
   while (1)
   {
 
-	  if (HAL_UART_Receive(&huart2, received_char, 1, 10) == HAL_OK) {
+	 if (HAL_UART_Receive(&huart2, received_char, 1, 10) == HAL_OK) {
 	  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)"Eco: ", strlen("Eco: "), 100);
 	  	  	  HAL_UART_Transmit(&huart2, received_char, 1, 100);
 	  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, 100); // Envia nova linha
 	  	  }
-
 	  if(nrf24_data_available()) {
 		  	  nrf24_receive(rx_buffer, pld_size);
 		  	  memcpy(&pacote_recebido, rx_buffer, sizeof(Pacote));
+	  		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
 		  	  if(pacote_recebido.id == id){
-		  		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
 		  		  snprintf(msg, sizeof(msg), "Radio: %d %.2f %.2f %.2f %d\r\n", pacote_recebido.id, pacote_recebido.Vx, pacote_recebido.Vy,pacote_recebido.Vang,pacote_recebido.kicker);
 		  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
 		  	  	  vx = pacote_recebido.Vx;
@@ -336,16 +336,34 @@ int main(void)
 	  if(kicker  > 8 && kicker < 12){
 		  HAL_Delay(4000);
 		  for(int i = 0; i<4; i++){
-			  acionar_motor(i+1, 50);
+			  acionar_motor(i+1, 1000);
 			  HAL_Delay(1000);
 			  acionar_motor(i+1, 0);
 			  HAL_Delay(1000);
-			  acionar_motor(i+1, -50);
+			  acionar_motor(i+1, -1000);
 			  HAL_Delay(1000);
 			  acionar_motor(i+1, 0);
 		  }
 		  continue;
 	  }
+	  if(kicker  > 14 && kicker < 16){
+	  		  HAL_Delay(4000);
+	  		  for(int i = 0; i<4; i++){
+	  			  acionar_motor(1, 1000);
+	  			  HAL_Delay(1000);
+	  			  acionar_motor(1, 0);
+	  			  acionar_motor(2, 1000);
+	  			  HAL_Delay(1000);
+	  			  acionar_motor(2, 0);
+	  			  acionar_motor(3, 1000);
+	  			  HAL_Delay(1000);
+	  			  acionar_motor(3, 0);
+	  			  acionar_motor(4, 1000);
+	  			  HAL_Delay(1000);
+	  			  acionar_motor(4, 0);
+	  		  }
+	  		  continue;
+	  	  }
 	  if(kicker > 18 && kicker < 22){
 		  	for(int i = 0; i<11; i++){
 	  			  acionar_motor(1, i*10);
@@ -752,11 +770,11 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SENTIDO0_MOTOR3_Pin|SENTIDO1_MOTOR3_Pin|SENTIDO0_MOTOR4_Pin|SENTIDO1_MOTOR4_Pin
+  HAL_GPIO_WritePin(GPIOB, SENTIDO0_MOTOR3_Pin|SENTIDO1_MOTOR3_Pin|SENTIDO1_MOTOR2_Pin|SENTIDO0_MOTOR2_Pin
                           |CE_Pin|CSN_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, SENTIDO0_MOTOR1_Pin|SENTIDO1_MOTOR1_Pin|SENTIDO0_MOTOR2_Pin|SENTIDO1_MOTOR2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, SENTIDO0_MOTOR1_Pin|SENTIDO1_MOTOR1_Pin|SENTIDO1_MOTOR4_Pin|SENTIDO0_MOTOR4_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_AZUL_Pin */
   GPIO_InitStruct.Pin = LED_AZUL_Pin;
@@ -765,21 +783,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_AZUL_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SENTIDO0_MOTOR3_Pin SENTIDO1_MOTOR3_Pin SENTIDO0_MOTOR4_Pin SENTIDO1_MOTOR4_Pin
-                           CE_Pin CSN_Pin */
-  GPIO_InitStruct.Pin = SENTIDO0_MOTOR3_Pin|SENTIDO1_MOTOR3_Pin|SENTIDO0_MOTOR4_Pin|SENTIDO1_MOTOR4_Pin
-                          |CE_Pin|CSN_Pin;
+  /*Configure GPIO pins : SENTIDO0_MOTOR3_Pin SENTIDO1_MOTOR3_Pin SENTIDO1_MOTOR2_Pin SENTIDO0_MOTOR2_Pin */
+  GPIO_InitStruct.Pin = SENTIDO0_MOTOR3_Pin|SENTIDO1_MOTOR3_Pin|SENTIDO1_MOTOR2_Pin|SENTIDO0_MOTOR2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SENTIDO0_MOTOR1_Pin SENTIDO1_MOTOR1_Pin SENTIDO0_MOTOR2_Pin SENTIDO1_MOTOR2_Pin */
-  GPIO_InitStruct.Pin = SENTIDO0_MOTOR1_Pin|SENTIDO1_MOTOR1_Pin|SENTIDO0_MOTOR2_Pin|SENTIDO1_MOTOR2_Pin;
+  /*Configure GPIO pins : SENTIDO0_MOTOR1_Pin SENTIDO1_MOTOR1_Pin SENTIDO1_MOTOR4_Pin SENTIDO0_MOTOR4_Pin */
+  GPIO_InitStruct.Pin = SENTIDO0_MOTOR1_Pin|SENTIDO1_MOTOR1_Pin|SENTIDO1_MOTOR4_Pin|SENTIDO0_MOTOR4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : CE_Pin CSN_Pin */
+  GPIO_InitStruct.Pin = CE_Pin|CSN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
