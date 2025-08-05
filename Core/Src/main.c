@@ -57,7 +57,6 @@ const uint32_t ARR = 1000;
 const float R = 1.0;
 const float Rr = 1.0;
 const float Velocidade_maxima_motor = 29.32153; // rads/segundo de 280rmp
-
 const float a1 = 0.785398;   // 45°
 const float a2 = 2.35619;  // 135°
 const float a3 = 3.92699; // 225°
@@ -123,6 +122,37 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void radio_setup() {
+	  ce_high();
+	  HAL_Delay(5);
+	  ce_low();
+
+	  nrf24_init();
+
+	  nrf24_auto_ack_all(auto_ack);
+	  nrf24_en_ack_pld(disable);
+	  nrf24_dpl(disable);
+
+	  nrf24_tx_pwr(_0dbm);
+	  nrf24_data_rate(_1mbps);
+	  nrf24_set_channel(channel);
+	  nrf24_set_addr_width(5);
+
+	  nrf24_pipe_pld_size(0, pld_size);
+	  nrf24_set_crc(en_crc, _1byte);
+
+	  nrf24_auto_retr_delay(4);
+	  nrf24_auto_retr_limit(10);
+
+	  nrf24_open_tx_pipe(addr);
+	  nrf24_open_rx_pipe(0, addr);
+
+	  nrf24_listen();
+
+	  ce_high();
+	  HAL_Delay(5);
+}
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM11)
@@ -133,6 +163,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             vy = 0;
             vang = 0;
             kicker = 0;
+            //radio_setup();
         }
         else
         {
@@ -140,6 +171,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         }
     }
 }
+
+
+
 
 void acionar_motor(int motor, float dutycycle){
 	TIM_HandleTypeDef *htim = NULL;
@@ -259,35 +293,8 @@ int main(void)
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
 
   //radio configuration
-  ce_high();
-  HAL_Delay(5);
-  ce_low();
-
-  nrf24_init();
-
-  nrf24_auto_ack_all(auto_ack);
-  nrf24_en_ack_pld(disable);
-  nrf24_dpl(disable);
-
-  nrf24_tx_pwr(_0dbm);
-  nrf24_data_rate(_1mbps);
-  nrf24_set_channel(channel);
-  nrf24_set_addr_width(5);
-
-  nrf24_pipe_pld_size(0, pld_size);
-  nrf24_set_crc(en_crc, _1byte);
-
-  nrf24_auto_retr_delay(4);
-  nrf24_auto_retr_limit(10);
-
-  nrf24_open_tx_pipe(addr);
-  nrf24_open_rx_pipe(0, addr);
-
-  nrf24_listen();
-
-  ce_high();
-  HAL_Delay(5);
-
+  radio_setup();
+  HAL_TIM_Base_Start_IT(&htim11);
   //UART variables
   char received_char[1];
   received_char[0] = 'a';
@@ -313,6 +320,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  pacote_recebido.Vx = 0;
+	  pacote_recebido.Vy = 0;
+	  pacote_recebido.Vang = 0;
+	  pacote_recebido.id = -1;
+	  pacote_recebido.kicker = 0;
 
 	 if (HAL_UART_Receive(&huart2, received_char, 1, 10) == HAL_OK) {
 	  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)"Eco: ", strlen("Eco: "), 100);
@@ -322,7 +334,6 @@ int main(void)
 	  if(nrf24_data_available()) {
 		  	  nrf24_receive(rx_buffer, pld_size);
 		  	  memcpy(&pacote_recebido, rx_buffer, sizeof(Pacote));
-	  		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
 		  	  if(pacote_recebido.id == id){
 		  		  snprintf(msg, sizeof(msg), "Radio: %d %.2f %.2f %.2f %d\r\n", pacote_recebido.id, pacote_recebido.Vx, pacote_recebido.Vy,pacote_recebido.Vang,pacote_recebido.kicker);
 		  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
@@ -331,8 +342,15 @@ int main(void)
 		  	  	  vang = pacote_recebido.Vang;
 		  	  	  kicker = pacote_recebido.kicker;
 		  	  	  radio_timeout = 1;
+		  	  	  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
+		  	  } else {
+		  		HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+		  		radio_timeout = 0;
 		  	  }
-	  } else HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+	  } else {
+		  radio_timeout = 0;
+		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+	  }
 	  if(kicker  > 8 && kicker < 12){
 		  HAL_Delay(4000);
 		  for(int i = 0; i<4; i++){
