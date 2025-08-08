@@ -401,7 +401,7 @@ int main(void)
 	      velocidade_angular[i] = ((1 / Rr) * (J[i][0] * vx + J[i][1] * vy + J[i][2] * vang));
 	  }
 	  float max_val = 0.0f;
-	  float velocidade_minima_motor = 0.2f*velocidade_maxima_motor; // 20% da velocidade máxima
+	  float velocidade_minima_motor = 0.4f*velocidade_maxima_motor; // 20% da velocidade máxima
 	  float min_val = 10000;
 
 	  // 1. Descobrir o valor máximo e mínimo absolutos

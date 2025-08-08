@@ -3677,7 +3677,7 @@ int main(void)
 	  float max_val = 0.0f;
  800209a:	f04f 0300 	mov.w	r3, #0
  800209e:	f8c7 30c8 	str.w	r3, [r7, #200]	@ 0xc8
-	  float velocidade_minima_motor = 0.2f*velocidade_maxima_motor; // 20% da velocidade máxima
+	  float velocidade_minima_motor = 0.4f*velocidade_maxima_motor; // 20% da velocidade máxima
  80020a2:	ed9f 7a12 	vldr	s14, [pc, #72]	@ 80020ec <main+0x754>
  80020a6:	eddf 7a0f 	vldr	s15, [pc, #60]	@ 80020e4 <main+0x74c>
  80020aa:	ee67 7a27 	vmul.f32	s15, s14, s15
@@ -3700,7 +3700,7 @@ int main(void)
  80020d8:	200001f8 	.word	0x200001f8
  80020dc:	200001fc 	.word	0x200001fc
  80020e0:	20000200 	.word	0x20000200
- 80020e4:	3e4ccccd 	.word	0x3e4ccccd
+ 80020e4:	3ecccccd 	.word	0x3ecccccd
  80020e8:	461c4000 	.word	0x461c4000
  80020ec:	41ea927e 	.word	0x41ea927e
 	      float abs_val = fabs(velocidade_angular[i]);
