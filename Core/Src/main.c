@@ -56,7 +56,7 @@ volatile uint8_t radio_timeout = 0;
 const uint32_t ARR = 1000;
 const float R = 1.0;
 const float Rr = 1.0;
-const float Velocidade_maxima_motor = 29.32153; // rads/segundo de 280rmp
+const float velocidade_maxima_motor = 29.32153; // rads/segundo de 280rmp
 const float a1 = 0.785398;   // 45°
 const float a2 = 2.35619;  // 135°
 const float a3 = 3.92699; // 225°
@@ -163,7 +163,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             vy = 0;
             vang = 0;
             kicker = 0;
-            //radio_setup();
         }
         else
         {
@@ -237,16 +236,13 @@ void acionar_motor(int motor, float dutycycle){
 		HAL_GPIO_WritePin(GPIOx1, GPIO_Pinx1, GPIO_PIN_RESET);
 	}
 
+
 	if (dutycycle > 100.0f){
 		dutycycle = 100.0f;
 	}
 
 	uint32_t frequencia = (uint32_t)((dutycycle / 100.0f) * (ARR));
 	__HAL_TIM_SET_COMPARE(htim, channel, frequencia);
-
-	//char msg[32];
-	//snprintf(msg, sizeof(msg), "%d %f %d\r\n", motor, dutycycle, sentido);
-	//HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
 }
 /* USER CODE END 0 */
 
@@ -400,14 +396,46 @@ int main(void)
 	  		continue;
 	  }
 
-	  float duty_cycle[4];
+	  float velocidade_angular[4];
 	  for (int i = 0; i < 4; i++) {
-	      duty_cycle[i] = 100*((1 / Rr) * (J[i][0] * vx + J[i][1] * vy + J[i][2] * vang))/Velocidade_maxima_motor;
+	      velocidade_angular[i] = ((1 / Rr) * (J[i][0] * vx + J[i][1] * vy + J[i][2] * vang));
 	  }
-	  acionar_motor(1, duty_cycle[0]);
-	  acionar_motor(2, duty_cycle[1]);
-	  acionar_motor(3, duty_cycle[2]);
-	  acionar_motor(4, duty_cycle[3]);
+	  float max_val = 0.0f;
+	  float velocidade_minima_motor = 0.2f*velocidade_maxima_motor; // 20% da velocidade máxima
+	  float min_val = 10000;
+
+	  // 1. Descobrir o valor máximo e mínimo absolutos
+	  for (int i = 0; i < 4; i++) {
+	      float abs_val = fabs(velocidade_angular[i]);
+	      if (abs_val > max_val) max_val = abs_val;
+	      if (abs_val < min_val && abs_val > 0) min_val = abs_val;
+	  }
+
+	  // 2. Escalar para não passar do máximo
+	  if (max_val > velocidade_maxima_motor) {
+	      float escala = velocidade_maxima_motor / max_val;
+	      for (int i = 0; i < 4; i++) {
+	          velocidade_angular[i] *= escala;
+	      }
+	      // Recalcula min_val após o ajuste
+	      min_val = 10000;
+	      for (int i = 0; i < 4; i++) {
+	          float abs_val = fabs(velocidade_angular[i]);
+	          if (abs_val < min_val && abs_val > 0) min_val = abs_val;
+	      }
+	  }
+
+	  // 3. Escalar para que o mínimo seja pelo menos o desejado
+	  if (min_val < velocidade_minima_motor && min_val > 0) {
+	      float escala = velocidade_minima_motor / min_val;
+	      for (int i = 0; i < 4; i++) {
+	          velocidade_angular[i] *= escala;
+	      }
+	  }
+	  acionar_motor(1, 100.0f*velocidade_angular[0]/velocidade_maxima_motor);
+	  acionar_motor(2, 100.0f*velocidade_angular[1]/velocidade_maxima_motor);
+	  acionar_motor(3, 100.0f*velocidade_angular[2]/velocidade_maxima_motor);
+	  acionar_motor(4, 100.0f*velocidade_angular[3]/velocidade_maxima_motor);
 
   }
     /* USER CODE END WHILE */
