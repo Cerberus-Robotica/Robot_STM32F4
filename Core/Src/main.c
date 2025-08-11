@@ -54,8 +54,8 @@ volatile uint8_t radio_timeout = 0;
 
 
 const uint32_t ARR = 1000;
-const float R = 1.0;
-const float Rr = 1.0;
+const float R = 0.0915;
+const float Rr = 0.02;
 const float velocidade_maxima_motor = 29.32153; // rads/segundo de 280rmp
 const float a1 = 0.785398;   // 45°
 const float a2 = 2.35619;  // 135°
