@@ -57,6 +57,8 @@ const uint32_t ARR = 1000;
 const float R = 0.0915;
 const float Rr = 0.02;
 const float velocidade_maxima_motor = 29.32153; // rads/segundo de 280rmp
+const float velocidade_minima_motor = 0.4*velocidade_maxima_motor;
+const float epsilon = 2;
 const float a1 = 0.785398;   // 45°
 const float a2 = 2.35619;  // 135°
 const float a3 = 3.92699; // 225°
@@ -396,42 +398,44 @@ int main(void)
 	  		continue;
 	  }
 
-	  float velocidade_angular[4];
-	  for (int i = 0; i < 4; i++) {
-	      velocidade_angular[i] = ((1 / Rr) * (J[i][0] * vx + J[i][1] * vy + J[i][2] * vang));
-	  }
-	  float max_val = 0.0f;
-	  float velocidade_minima_motor = 0.4f*velocidade_maxima_motor; // 20% da velocidade máxima
-	  float min_val = 10000;
+	    float velocidade_angular[4];
+	    for (int i = 0; i < 4; i++) {
+	        velocidade_angular[i] = (1.0f / Rr) * (J[i][0] * vx + J[i][1] * vy + J[i][2] * vang);
+	    }
 
-	  // 1. Descobrir o valor máximo e mínimo absolutos
-	  for (int i = 0; i < 4; i++) {
-	      float abs_val = fabs(velocidade_angular[i]);
-	      if (abs_val > max_val) max_val = abs_val;
-	      if (abs_val < min_val && abs_val > 0) min_val = abs_val;
-	  }
+	    // 2. Normalizar pelo máximo permitido
+	    float max_val = 0.0f;
+	    for (int i = 0; i < 4; i++) {
+	        float abs_val = fabs(velocidade_angular[i]);
+	        if (abs_val > max_val) max_val = abs_val;
+	    }
+	    if (max_val > velocidade_maxima_motor) {
+	        float escala = velocidade_maxima_motor / max_val;
+	        for (int i = 0; i < 4; i++) {
+	            velocidade_angular[i] *= escala;
+	        }
+	    }
 
-	  // 2. Escalar para não passar do máximo
-	  if (max_val > velocidade_maxima_motor) {
-	      float escala = velocidade_maxima_motor / max_val;
-	      for (int i = 0; i < 4; i++) {
-	          velocidade_angular[i] *= escala;
-	      }
-	      // Recalcula min_val após o ajuste
-	      min_val = 10000;
-	      for (int i = 0; i < 4; i++) {
-	          float abs_val = fabs(velocidade_angular[i]);
-	          if (abs_val < min_val && abs_val > 0) min_val = abs_val;
-	      }
-	  }
+	    // 3. Garantir mínimo para rodas em movimento
+	    float min_val = 1e9f;
+	    for (int i = 0; i < 4; i++) {
+	        float abs_val = fabs(velocidade_angular[i]);
+	        if (abs_val > epsilon && abs_val < min_val) {
+	            min_val = abs_val;
+	        }
+	    }
+	  if (min_val < velocidade_minima_motor && min_val > epsilon) {
+	        float escala = velocidade_minima_motor / min_val;
+	        for (int i = 0; i < 4; i++) {
+	            if (fabs(velocidade_angular[i]) > epsilon) {
+	                velocidade_angular[i] *= escala;
+	                if (velocidade_angular[i] > velocidade_maxima_motor) velocidade_angular[i] = velocidade_maxima_motor;
+	                if (velocidade_angular[i] < -velocidade_maxima_motor) velocidade_angular[i] = -velocidade_maxima_motor;
+	            }
+	        }
+	    }
 
-	  // 3. Escalar para que o mínimo seja pelo menos o desejado
-	  if (min_val < velocidade_minima_motor && min_val > 0) {
-	      float escala = velocidade_minima_motor / min_val;
-	      for (int i = 0; i < 4; i++) {
-	          velocidade_angular[i] *= escala;
-	      }
-	  }
+
 	  acionar_motor(1, 100.0f*velocidade_angular[0]/velocidade_maxima_motor);
 	  acionar_motor(2, 100.0f*velocidade_angular[1]/velocidade_maxima_motor);
 	  acionar_motor(3, 100.0f*velocidade_angular[2]/velocidade_maxima_motor);
