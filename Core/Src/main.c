@@ -136,15 +136,15 @@ void radio_setup() {
 	  nrf24_dpl(disable);
 
 	  nrf24_tx_pwr(_0dbm);
-	  nrf24_data_rate(_1mbps);
+	  nrf24_data_rate(_2mbps);
 	  nrf24_set_channel(channel);
 	  nrf24_set_addr_width(5);
 
 	  nrf24_pipe_pld_size(0, pld_size);
 	  nrf24_set_crc(en_crc, _1byte);
 
-	  nrf24_auto_retr_delay(4);
-	  nrf24_auto_retr_limit(10);
+	  nrf24_auto_retr_delay(0);
+	  nrf24_auto_retr_limit(5);
 
 	  nrf24_open_tx_pipe(addr);
 	  nrf24_open_rx_pipe(0, addr);
