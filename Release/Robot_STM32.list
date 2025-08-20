@@ -2042,7 +2042,7 @@ Disassembly of section .text:
  8001762:	f44f 7382 	mov.w	r3, #260	@ 0x104
  8001766:	e9c0 5300 	strd	r5, r3, [r0]
  800176a:	f44f 7600 	mov.w	r6, #512	@ 0x200
- 800176e:	2318      	movs	r3, #24
+ 800176e:	2310      	movs	r3, #16
  8001770:	e9c0 6306 	strd	r6, r3, [r0, #24]
  8001774:	230a      	movs	r3, #10
  8001776:	e9c0 4402 	strd	r4, r4, [r0, #8]
