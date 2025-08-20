@@ -57,7 +57,7 @@ const uint32_t ARR = 1000;
 const float R = 0.0915;
 const float Rr = 0.02;
 const float velocidade_maxima_motor = 29.32153; // rads/segundo de 280rmp
-const float velocidade_minima_motor = 0.4*velocidade_maxima_motor;
+const float velocidade_minima_motor = 0.6*velocidade_maxima_motor;
 const float epsilon = 2;
 const float a1 = 0.785398;   // 45°
 const float a2 = 2.35619;  // 135°
@@ -551,7 +551,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -759,8 +759,7 @@ static void MX_TIM11_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN TIM11_Init 2 */
-  HAL_NVIC_SetPriority(TIM1_TRG_COM_TIM11_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(TIM1_TRG_COM_TIM11_IRQn);
+
   /* USER CODE END TIM11_Init 2 */
 
 }
@@ -837,14 +836,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pin = SENTIDO0_MOTOR3_Pin|SENTIDO1_MOTOR3_Pin|SENTIDO1_MOTOR2_Pin|SENTIDO0_MOTOR2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SENTIDO0_MOTOR1_Pin SENTIDO1_MOTOR1_Pin SENTIDO1_MOTOR4_Pin SENTIDO0_MOTOR4_Pin */
   GPIO_InitStruct.Pin = SENTIDO0_MOTOR1_Pin|SENTIDO1_MOTOR1_Pin|SENTIDO1_MOTOR4_Pin|SENTIDO0_MOTOR4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : CE_Pin CSN_Pin */
