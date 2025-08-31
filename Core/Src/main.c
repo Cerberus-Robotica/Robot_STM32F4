@@ -457,6 +457,7 @@ int main(void)
 	        }
 	    }
 
+
       // 4. Conversão para duty cycle [%]
       for (int i = 0; i < 4; i++) {
           duty_cycle[i] = (velocidade_angular[i] / velocidade_maxima_motor) * 100.0f;
