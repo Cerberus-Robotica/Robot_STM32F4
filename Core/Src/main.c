@@ -64,7 +64,12 @@ const float a2 = 2.35619;  // 135°
 const float a3 = 3.92699; // 225°
 const float a4 = 5.49779;  // 315°
 
-
+//Variaveis do Softstart
+float duty_cycle[4];
+float duty_cycle_atual[4] = {0, 0, 0, 0}; // PWM atual de cada motor
+uint32_t ultimaAtualizacao = 0;
+const uint32_t intervalo_ms = 20;  // Atualização a cada 20ms (~50Hz)
+const float passo_pwm = 3.0f;      // Incremento por atualização
 
 
 
@@ -245,6 +250,23 @@ void acionar_motor(int motor, float dutycycle){
 
 	uint32_t frequencia = (uint32_t)((dutycycle / 100.0f) * (ARR));
 	__HAL_TIM_SET_COMPARE(htim, channel, frequencia);
+}
+
+void soft_start_motor(int motor, float pwm_alvo, float passo) {
+    if (pwm_alvo > 100.0f) pwm_alvo = 100.0f;
+    if (pwm_alvo < -100.0f) pwm_alvo = -100.0f;
+
+    float* pwm_atual = &duty_cycle_atual[motor - 1];
+
+    if (fabs(*pwm_atual - pwm_alvo) < passo) {
+        *pwm_atual = pwm_alvo;
+    } else if (*pwm_atual < pwm_alvo) {
+        *pwm_atual += passo;
+    } else {
+        *pwm_atual -= passo;
+    }
+
+    acionar_motor(motor, *pwm_atual);
 }
 /* USER CODE END 0 */
 
@@ -435,11 +457,25 @@ int main(void)
 	        }
 	    }
 
+      // 4. Conversão para duty cycle [%]
+      for (int i = 0; i < 4; i++) {
+          duty_cycle[i] = (velocidade_angular[i] / velocidade_maxima_motor) * 100.0f;
 
-	  acionar_motor(1, 100.0f*velocidade_angular[0]/velocidade_maxima_motor);
-	  acionar_motor(2, 100.0f*velocidade_angular[1]/velocidade_maxima_motor);
-	  acionar_motor(3, 100.0f*velocidade_angular[2]/velocidade_maxima_motor);
-	  acionar_motor(4, 100.0f*velocidade_angular[3]/velocidade_maxima_motor);
+          // Limita para [-100, 100]
+          if (duty_cycle[i] > 100.0f) duty_cycle[i] = 100.0f;
+          if (duty_cycle[i] < -100.0f) duty_cycle[i] = -100.0f;
+      }
+
+      // 5. Softstart para aplicar os valores suavemente
+
+	  if (HAL_GetTick() - ultimaAtualizacao >= intervalo_ms) {
+	 	      ultimaAtualizacao = HAL_GetTick();
+
+	 	        for (int i = 0; i < 4; i++) {
+	 	            soft_start_motor(i + 1, duty_cycle[i], passo_pwm);
+	 	        }
+	 	  }
+
 
   }
     /* USER CODE END WHILE */
