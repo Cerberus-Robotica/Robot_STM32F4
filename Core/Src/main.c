@@ -64,7 +64,12 @@ const float a2 = 2.35619;  // 135°
 const float a3 = 3.92699; // 225°
 const float a4 = 5.49779;  // 315°
 
-
+//Variaveis do Softstart
+float duty_cycle[4];
+float duty_cycle_atual[4] = {0, 0, 0, 0}; // PWM atual de cada motor
+uint32_t ultimaAtualizacao = 0;
+const uint32_t intervalo_ms = 20;  // Atualização a cada 20ms (~50Hz)
+const float passo_pwm = 3.0f;      // Incremento por atualização
 
 
 
@@ -102,8 +107,6 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim11;
 
-UART_HandleTypeDef huart2;
-
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -117,7 +120,6 @@ static void MX_TIM2_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -174,77 +176,75 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 
+void acionar_motor(int motor, float dutycycle) {
+    TIM_HandleTypeDef *htimA = NULL;
+    uint32_t channelA = 0;
+    TIM_HandleTypeDef *htimB = NULL;
+    uint32_t channelB = 0;
+
+    switch (motor) {
+        case 1:
+            htimA = &htim1;
+            channelA = TIM_CHANNEL_2;
+            htimB = &htim1;
+            channelB = TIM_CHANNEL_1;
+            break;
+        case 2:
+            htimA = &htim1;
+            channelA = TIM_CHANNEL_3;
+            htimB = &htim1;
+            channelB = TIM_CHANNEL_4;
+            break;
+        case 3:
+            htimA = &htim2;
+            channelA = TIM_CHANNEL_3;
+            htimB = &htim3;
+            channelB = TIM_CHANNEL_4;
+            break;
+        case 4:
+            htimA = &htim2;
+            channelA = TIM_CHANNEL_1;
+            htimB = &htim3;
+            channelB = TIM_CHANNEL_3;
+            break;
+        default:
+            return;
+    }
+
+    // Limita dutycycle
+    if (dutycycle > 100.0f) dutycycle = 100.0f;
+    if (dutycycle < -100.0f) dutycycle = -100.0f;
+
+    uint32_t pwm_value = (uint32_t)((fabsf(dutycycle) / 100.0f) * ARR);
+
+    if (dutycycle > 0) {
+        __HAL_TIM_SET_COMPARE(htimA, channelA, pwm_value);
+        __HAL_TIM_SET_COMPARE(htimB, channelB, 0);
+    } else if (dutycycle < 0) {
+        __HAL_TIM_SET_COMPARE(htimA, channelA, 0);
+        __HAL_TIM_SET_COMPARE(htimB, channelB, pwm_value);
+    } else {
+        __HAL_TIM_SET_COMPARE(htimA, channelA, 0);
+        __HAL_TIM_SET_COMPARE(htimB, channelB, 0);
+    }
+}
 
 
-void acionar_motor(int motor, float dutycycle){
-	TIM_HandleTypeDef *htim = NULL;
-	uint32_t channel = 0;
-	GPIO_TypeDef* GPIOx0 = NULL;
-	uint16_t GPIO_Pinx0 = 0;
-	GPIO_TypeDef* GPIOx1 = NULL;
-	uint16_t GPIO_Pinx1 = 0;
+void soft_start_motor(int motor, float pwm_alvo, float passo) {
+    if (pwm_alvo > 100.0f) pwm_alvo = 100.0f;
+    if (pwm_alvo < -100.0f) pwm_alvo = -100.0f;
 
+    float* pwm_atual = &duty_cycle_atual[motor - 1];
 
-	switch(motor){
-	case 1:
-		htim = PWM_MOTOR1_TIMER;
-		channel = PWM_MOTOR1_CHANNEL;
-		GPIOx0 = SENTIDO0_MOTOR1_GPIO_Port;
-		GPIO_Pinx0 = SENTIDO0_MOTOR1_Pin;
-		GPIOx1 = SENTIDO1_MOTOR1_GPIO_Port;
-		GPIO_Pinx1 = SENTIDO1_MOTOR1_Pin;
-		break;
-	case 2:
-		htim = PWM_MOTOR2_TIMER;
-		channel = PWM_MOTOR2_CHANNEL;
-		GPIOx0 = SENTIDO0_MOTOR2_GPIO_Port;
-		GPIO_Pinx0 = SENTIDO0_MOTOR2_Pin;
-		GPIOx1 = SENTIDO1_MOTOR2_GPIO_Port;
-		GPIO_Pinx1 = SENTIDO1_MOTOR2_Pin;
-			break;
-	case 3:
-		htim = PWM_MOTOR3_TIMER;
-		channel = PWM_MOTOR3_CHANNEL;
-		GPIOx0 = SENTIDO0_MOTOR3_GPIO_Port;
-		GPIO_Pinx0 = SENTIDO0_MOTOR3_Pin;
-		GPIOx1 = SENTIDO1_MOTOR3_GPIO_Port;
-		GPIO_Pinx1 = SENTIDO1_MOTOR3_Pin;
-			break;
-	case 4:
-		htim = PWM_MOTOR4_TIMER;
-		channel = PWM_MOTOR4_CHANNEL;
-		GPIOx0 = SENTIDO0_MOTOR4_GPIO_Port;
-		GPIO_Pinx0 = SENTIDO0_MOTOR4_Pin;
-		GPIOx1 = SENTIDO1_MOTOR4_GPIO_Port;
-		GPIO_Pinx1 = SENTIDO1_MOTOR4_Pin;
-			break;
-	default:
-		return;
-	}
-	int sentido = 0;
-	if (dutycycle < 0){
-		HAL_GPIO_WritePin(GPIOx0, GPIO_Pinx0, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(GPIOx1, GPIO_Pinx1, GPIO_PIN_RESET);
-		dutycycle = -dutycycle;
-		sentido = -1;
-	}
-	else {
-		HAL_GPIO_WritePin(GPIOx0, GPIO_Pinx0, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOx1, GPIO_Pinx1, GPIO_PIN_SET);
-		sentido = 1;
-	}
-	if (dutycycle == 0){
-		HAL_GPIO_WritePin(GPIOx0, GPIO_Pinx0, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(GPIOx1, GPIO_Pinx1, GPIO_PIN_RESET);
-	}
+    if (fabs(*pwm_atual - pwm_alvo) < passo) {
+        *pwm_atual = pwm_alvo;
+    } else if (*pwm_atual < pwm_alvo) {
+        *pwm_atual += passo;
+    } else {
+        *pwm_atual -= passo;
+    }
 
-
-	if (dutycycle > 100.0f){
-		dutycycle = 100.0f;
-	}
-
-	uint32_t frequencia = (uint32_t)((dutycycle / 100.0f) * (ARR));
-	__HAL_TIM_SET_COMPARE(htim, channel, frequencia);
+    acionar_motor(motor, *pwm_atual);
 }
 /* USER CODE END 0 */
 
@@ -283,20 +283,20 @@ int main(void)
   MX_TIM11_Init();
   MX_TIM3_Init();
   MX_I2C1_Init();
-  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
 
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
   //radio configuration
   radio_setup();
   HAL_TIM_Base_Start_IT(&htim11);
-  //UART variables
-  char received_char[1];
-  received_char[0] = 'a';
-  char msg[64];
 
   //Radio variables
   uint8_t rx_buffer[pld_size];
@@ -311,135 +311,157 @@ int main(void)
   	  	    {-sin(a4), cos(a4), R}
   	  	  };
   HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
-  HAL_UART_Transmit(&huart2, (uint8_t*)"Iniciado!", strlen("Iniciado!"), 100);
+  //HAL_UART_Transmit(&huart2, (uint8_t*)"Iniciado!", strlen("Iniciado!"), 100);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  pacote_recebido.Vx = 0;
-	  pacote_recebido.Vy = 0;
-	  pacote_recebido.Vang = 0;
-	  pacote_recebido.id = -1;
-	  pacote_recebido.kicker = 0;
+  // Inicializa pacote com valores padrão
+  pacote_recebido.Vx = 0;
+  pacote_recebido.Vy = 0;
+  pacote_recebido.Vang = 0;
+  pacote_recebido.id = id;
+  pacote_recebido.kicker = 0;
 
-	 if (HAL_UART_Receive(&huart2, received_char, 1, 10) == HAL_OK) {
-	  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)"Eco: ", strlen("Eco: "), 100);
-	  	  	  HAL_UART_Transmit(&huart2, received_char, 1, 100);
-	  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, 100); // Envia nova linha
-	  	  }
-	  if(nrf24_data_available()) {
-		  	  nrf24_receive(rx_buffer, pld_size);
-		  	  memcpy(&pacote_recebido, rx_buffer, sizeof(Pacote));
-		  	  if(pacote_recebido.id == id){
-		  		  snprintf(msg, sizeof(msg), "Radio: %d %.2f %.2f %.2f %d\r\n", pacote_recebido.id, pacote_recebido.Vx, pacote_recebido.Vy,pacote_recebido.Vang,pacote_recebido.kicker);
-		  	  	  HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), 100);
-		  	  	  vx = pacote_recebido.Vx;
-		  	  	  vy = pacote_recebido.Vy;
-		  	  	  vang = pacote_recebido.Vang;
-		  	  	  kicker = pacote_recebido.kicker;
-		  	  	  radio_timeout = 1;
-		  	  	  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
-		  	  } else {
-		  		HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
-		  		radio_timeout = 0;
-		  	  }
+  // ---- Comunicação via rádio ----
+  if(nrf24_data_available()) {
+	  nrf24_receive(rx_buffer, pld_size);
+	  memcpy(&pacote_recebido, rx_buffer, sizeof(Pacote));
+
+	  if(pacote_recebido.id == id){
+		  // Atualiza variáveis globais
+		  vx = pacote_recebido.Vx;
+		  vy = pacote_recebido.Vy;
+		  vang = pacote_recebido.Vang;
+		  kicker = pacote_recebido.kicker;
+
+		  radio_timeout = 1;
+		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
 	  } else {
-		  radio_timeout = 0;
 		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+		  radio_timeout = 0;
 	  }
-	  if(kicker  > 8 && kicker < 12){
-		  HAL_Delay(4000);
-		  for(int i = 0; i<4; i++){
-			  acionar_motor(i+1, 1000);
-			  HAL_Delay(1000);
-			  acionar_motor(i+1, 0);
-			  HAL_Delay(1000);
-			  acionar_motor(i+1, -1000);
-			  HAL_Delay(1000);
-			  acionar_motor(i+1, 0);
+  } else {
+	  radio_timeout = 0;
+	  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+  }
+
+  // ---- Testes especiais (kicker) ----
+  if(kicker  > 8 && kicker < 12){
+	  HAL_Delay(4000);
+	  for(int i = 0; i<4; i++){
+		  acionar_motor(i+1, 1000);
+		  HAL_Delay(1000);
+		  acionar_motor(i+1, 0);
+		  HAL_Delay(1000);
+		  acionar_motor(i+1, -1000);
+		  HAL_Delay(1000);
+		  acionar_motor(i+1, 0);
+	  }
+	  continue;
+  }
+  if(kicker  > 14 && kicker < 16){
+	  HAL_Delay(4000);
+	  for(int i = 0; i<4; i++){
+		  acionar_motor(1, 100);
+		  HAL_Delay(1000);
+		  acionar_motor(1, 0);
+		  acionar_motor(2, 100);
+		  HAL_Delay(1000);
+		  acionar_motor(2, 0);
+		  acionar_motor(3, 100);
+		  HAL_Delay(1000);
+		  acionar_motor(3, 0);
+		  acionar_motor(4, 100);
+		  HAL_Delay(1000);
+		  acionar_motor(4, 0);
+	  }
+	  continue;
+  }
+  if(kicker > 18 && kicker < 22){
+	  for(int i = 0; i<11; i++){
+		  acionar_motor(1, i*10);
+		  acionar_motor(2, i*10);
+		  acionar_motor(3, i*10);
+		  acionar_motor(4, i*10);
+		  HAL_Delay(2000);
+	  }
+	  for(int i = 0; i<11; i++){
+		  acionar_motor(1, -i*10);
+		  acionar_motor(2, -i*10);
+		  acionar_motor(3, -i*10);
+		  acionar_motor(4, -i*10);
+		  HAL_Delay(2000);
+	  }
+	  continue;
+  }
+
+  // ---- Cinemática do robô ----
+  float velocidade_angular[4];
+  for (int i = 0; i < 4; i++) {
+	  velocidade_angular[i] = (1.0f / Rr) * (J[i][0] * vx + J[i][1] * vy + J[i][2] * vang);
+  }
+
+  // Normalizar
+  float max_val = 0.0f;
+  for (int i = 0; i < 4; i++) {
+	  float abs_val = fabs(velocidade_angular[i]);
+	  if (abs_val > max_val) max_val = abs_val;
+  }
+  if (max_val > velocidade_maxima_motor) {
+	  float escala = velocidade_maxima_motor / max_val;
+	  for (int i = 0; i < 4; i++) {
+		  velocidade_angular[i] *= escala;
+	  }
+  }
+
+  // Garantir mínimo
+  float min_val = 1e9f;
+  for (int i = 0; i < 4; i++) {
+	  float abs_val = fabs(velocidade_angular[i]);
+	  if (abs_val > epsilon && abs_val < min_val) {
+		  min_val = abs_val;
+	  }
+  }
+  if (min_val < velocidade_minima_motor && min_val > epsilon) {
+	  float escala = velocidade_minima_motor / min_val;
+	  for (int i = 0; i < 4; i++) {
+		  if (fabs(velocidade_angular[i]) > epsilon) {
+			  velocidade_angular[i] *= escala;
+			  if (velocidade_angular[i] > velocidade_maxima_motor) velocidade_angular[i] = velocidade_maxima_motor;
+			  if (velocidade_angular[i] < -velocidade_maxima_motor) velocidade_angular[i] = -velocidade_maxima_motor;
 		  }
-		  continue;
 	  }
-	  if(kicker  > 14 && kicker < 16){
-	  		  HAL_Delay(4000);
-	  		  for(int i = 0; i<4; i++){
-	  			  acionar_motor(1, 1000);
-	  			  HAL_Delay(1000);
-	  			  acionar_motor(1, 0);
-	  			  acionar_motor(2, 1000);
-	  			  HAL_Delay(1000);
-	  			  acionar_motor(2, 0);
-	  			  acionar_motor(3, 1000);
-	  			  HAL_Delay(1000);
-	  			  acionar_motor(3, 0);
-	  			  acionar_motor(4, 1000);
-	  			  HAL_Delay(1000);
-	  			  acionar_motor(4, 0);
-	  		  }
-	  		  continue;
-	  	  }
-	  if(kicker > 18 && kicker < 22){
-		  	for(int i = 0; i<11; i++){
-	  			  acionar_motor(1, i*10);
-	  			  acionar_motor(2, i*10);
-	  			  acionar_motor(3, i*10);
-	  			  acionar_motor(4, i*10);
-	  			  HAL_Delay(2000);
-	  		}
-	  		for(int i = 0; i<11; i++){
-	  			  acionar_motor(1, -i*10);
-	  			  acionar_motor(2, -i*10);
-	  			  acionar_motor(3, -i*10);
-	  			  acionar_motor(4, -i*10);
-	  			  HAL_Delay(2000);
-	  		}
-	  		continue;
-	  }
+  }
 
-	    float velocidade_angular[4];
-	    for (int i = 0; i < 4; i++) {
-	        velocidade_angular[i] = (1.0f / Rr) * (J[i][0] * vx + J[i][1] * vy + J[i][2] * vang);
-	    }
+  // Aplicar nos motores
+  acionar_motor(1, 100.0f*velocidade_angular[0]/velocidade_maxima_motor);
+  acionar_motor(2, 100.0f*velocidade_angular[1]/velocidade_maxima_motor);
+  acionar_motor(3, 100.0f*velocidade_angular[2]/velocidade_maxima_motor);
+  acionar_motor(4, 100.0f*velocidade_angular[3]/velocidade_maxima_motor);
 
-	    // 2. Normalizar pelo máximo permitido
-	    float max_val = 0.0f;
-	    for (int i = 0; i < 4; i++) {
-	        float abs_val = fabs(velocidade_angular[i]);
-	        if (abs_val > max_val) max_val = abs_val;
-	    }
-	    if (max_val > velocidade_maxima_motor) {
-	        float escala = velocidade_maxima_motor / max_val;
-	        for (int i = 0; i < 4; i++) {
-	            velocidade_angular[i] *= escala;
-	        }
-	    }
+/*
+      // 4. Conversão para duty cycle [%]
+      for (int i = 0; i < 4; i++) {
+          duty_cycle[i] = (velocidade_angular[i] / velocidade_maxima_motor) * 100.0f;
 
-	    // 3. Garantir mínimo para rodas em movimento
-	    float min_val = 1e9f;
-	    for (int i = 0; i < 4; i++) {
-	        float abs_val = fabs(velocidade_angular[i]);
-	        if (abs_val > epsilon && abs_val < min_val) {
-	            min_val = abs_val;
-	        }
-	    }
-	  if (min_val < velocidade_minima_motor && min_val > epsilon) {
-	        float escala = velocidade_minima_motor / min_val;
-	        for (int i = 0; i < 4; i++) {
-	            if (fabs(velocidade_angular[i]) > epsilon) {
-	                velocidade_angular[i] *= escala;
-	                if (velocidade_angular[i] > velocidade_maxima_motor) velocidade_angular[i] = velocidade_maxima_motor;
-	                if (velocidade_angular[i] < -velocidade_maxima_motor) velocidade_angular[i] = -velocidade_maxima_motor;
-	            }
-	        }
-	    }
+          // Limita para [-100, 100]
+          if (duty_cycle[i] > 100.0f) duty_cycle[i] = 100.0f;
+          if (duty_cycle[i] < -100.0f) duty_cycle[i] = -100.0f;
+      }
 
+      // 5. Softstart para aplicar os valores suavemente
 
-	  acionar_motor(1, 100.0f*velocidade_angular[0]/velocidade_maxima_motor);
-	  acionar_motor(2, 100.0f*velocidade_angular[1]/velocidade_maxima_motor);
-	  acionar_motor(3, 100.0f*velocidade_angular[2]/velocidade_maxima_motor);
-	  acionar_motor(4, 100.0f*velocidade_angular[3]/velocidade_maxima_motor);
+	  if (HAL_GetTick() - ultimaAtualizacao >= intervalo_ms) {
+	 	      ultimaAtualizacao = HAL_GetTick();
+
+	 	        for (int i = 0; i < 4; i++) {
+	 	            soft_start_motor(i + 1, duty_cycle[i], passo_pwm);
+	 	        }
+	 	  }
+*/
 
   }
     /* USER CODE END WHILE */
@@ -613,6 +635,18 @@ static void MX_TIM1_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
   sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
   sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
   sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
@@ -673,6 +707,10 @@ static void MX_TIM2_Init(void)
   {
     Error_Handler();
   }
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
@@ -718,11 +756,11 @@ static void MX_TIM3_Init(void)
   sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
   {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
   {
     Error_Handler();
   }
@@ -765,39 +803,6 @@ static void MX_TIM11_Init(void)
 }
 
 /**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART2_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART2_Init 0 */
-
-  /* USER CODE END USART2_Init 0 */
-
-  /* USER CODE BEGIN USART2_Init 1 */
-
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
-
-  /* USER CODE END USART2_Init 2 */
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -819,11 +824,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SENTIDO0_MOTOR3_Pin|SENTIDO1_MOTOR3_Pin|SENTIDO1_MOTOR2_Pin|SENTIDO0_MOTOR2_Pin
-                          |CE_Pin|CSN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, SPI_CSN_Pin|SPI_CE_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, SENTIDO0_MOTOR1_Pin|SENTIDO1_MOTOR1_Pin|SENTIDO1_MOTOR4_Pin|SENTIDO0_MOTOR4_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(sinal_kicker_GPIO_Port, sinal_kicker_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_AZUL_Pin */
   GPIO_InitStruct.Pin = LED_AZUL_Pin;
@@ -832,26 +836,33 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_AZUL_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SENTIDO0_MOTOR3_Pin SENTIDO1_MOTOR3_Pin SENTIDO1_MOTOR2_Pin SENTIDO0_MOTOR2_Pin */
-  GPIO_InitStruct.Pin = SENTIDO0_MOTOR3_Pin|SENTIDO1_MOTOR3_Pin|SENTIDO1_MOTOR2_Pin|SENTIDO0_MOTOR2_Pin;
+  /*Configure GPIO pins : SPI_CSN_Pin SPI_CE_Pin */
+  GPIO_InitStruct.Pin = SPI_CSN_Pin|SPI_CE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : SENTIDO0_MOTOR1_Pin SENTIDO1_MOTOR1_Pin SENTIDO1_MOTOR4_Pin SENTIDO0_MOTOR4_Pin */
-  GPIO_InitStruct.Pin = SENTIDO0_MOTOR1_Pin|SENTIDO1_MOTOR1_Pin|SENTIDO1_MOTOR4_Pin|SENTIDO0_MOTOR4_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CE_Pin CSN_Pin */
-  GPIO_InitStruct.Pin = CE_Pin|CSN_Pin;
+  /*Configure GPIO pin : sinal_kicker_Pin */
+  GPIO_InitStruct.Pin = sinal_kicker_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(sinal_kicker_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : sinal_hall_1_Pin sinal_hall_2_Pin sinal_hall_3_Pin sinal_hall_4_Pin
+                           sinal_hall_5_Pin sinal_hall_6_Pin sinal_hall_7_Pin sinal_hall_8_Pin */
+  GPIO_InitStruct.Pin = sinal_hall_1_Pin|sinal_hall_2_Pin|sinal_hall_3_Pin|sinal_hall_4_Pin
+                          |sinal_hall_5_Pin|sinal_hall_6_Pin|sinal_hall_7_Pin|sinal_hall_8_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : Sensor_bola_Pin */
+  GPIO_InitStruct.Pin = Sensor_bola_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(Sensor_bola_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -875,8 +886,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
