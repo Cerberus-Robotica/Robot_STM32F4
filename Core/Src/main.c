@@ -45,7 +45,7 @@ typedef struct {
 #pragma pack(pop)
 
 typedef struct {
-    uint32_t id;          // ID do robô
+    uint8_t id;          // ID do robô
 } Info;
 
 Info info;
@@ -346,6 +346,8 @@ void act_config(){
 				  HAL_Delay(2000);
 			  }
 		  }
+		  config = 0;
+		  param = 0;
 	}
 }
 
@@ -416,8 +418,15 @@ int main(void)
   	  	    {-sin(a4), cos(a4), R}
   	  	  };
   HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
-  leFlash(&info);
-  id = info.id;
+  //leFlash(&info);
+  info.id = -1;
+  if(info.id == 0xFF || info.id > 15 || info.id < -1 || info.id == 0xFF) {
+	  Info new_info;
+	  new_info.id = -1;
+	  //gravaFlash(&new_info);
+	  //leFlash(&info);
+  }
+  id = -1;
   //HAL_UART_Transmit(&huart2, (uint8_t*)"Iniciado!", strlen("Iniciado!"), 100);
   /* USER CODE END 2 */
 
@@ -428,13 +437,15 @@ int main(void)
 	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
 		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
 		  HAL_Delay(2000);
-		  for (int i = 0; i < id ; i++) {
-			  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
-			  HAL_Delay(1000);
-			  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
-			  HAL_Delay(1000);
+		  if(id != 0xFF){
+			  for (int i = 0; i < id ; i++) {
+				  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+				  HAL_Delay(1000);
+				  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
+				  HAL_Delay(1000);
+			  }
 		  }
-		  if (id == -1) {
+		  if (id == -1 || id == 0xFF) {
 			  for (int i = 0; i<3; i++) {
 				  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
 				  HAL_Delay(500);
@@ -451,7 +462,7 @@ int main(void)
   pacote_recebido.Vx = 0;
   pacote_recebido.Vy = 0;
   pacote_recebido.Vang = 0;
-  pacote_recebido.id = id;
+  pacote_recebido.id = -10;
   pacote_recebido.kicker = 0;
   pacote_recebido.config = 0;
   pacote_recebido.param = 0;

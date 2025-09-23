@@ -1,7 +1,10 @@
-../Core/Src/main.c:129:6:radio_setup	8	static
-../Core/Src/main.c:160:6:HAL_TIM_PeriodElapsedCallback	0	static
-../Core/Src/main.c:179:6:acionar_motor	8	static
-../Core/Src/main.c:233:6:soft_start_motor	0	static
-../Core/Src/main.c:476:6:SystemClock_Config	88	static,ignoring_inline_asm
-../Core/Src/main.c:255:5:main	152	dynamic,ignoring_inline_asm
-../Core/Src/main.c:878:6:Error_Handler	0	static,ignoring_inline_asm
+../Core/Src/main.c:141:6:radio_setup	8	static
+../Core/Src/main.c:172:6:HAL_TIM_PeriodElapsedCallback	0	static
+../Core/Src/main.c:193:6:acionar_motor	8	static
+../Core/Src/main.c:247:6:soft_start_motor	0	static
+../Core/Src/main.c:264:6:gravaFlash	40	static
+../Core/Src/main.c:291:6:leFlash	0	static
+../Core/Src/main.c:297:6:act_config	24	static
+../Core/Src/main.c:577:6:SystemClock_Config	88	static,ignoring_inline_asm
+../Core/Src/main.c:360:5:main	144	dynamic,ignoring_inline_asm
+../Core/Src/main.c:985:6:Error_Handler	0	static,ignoring_inline_asm
