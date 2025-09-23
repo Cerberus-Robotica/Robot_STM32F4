@@ -31,20 +31,32 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+#define FLASH_USER_SECTOR      FLASH_SECTOR_7
+#define FLASH_USER_START_ADDR  0x08060000UL  // setor reservado
 
 #pragma pack(push, 1)
 typedef struct {
     uint8_t id;
     float Vx, Vy, Vang;
     uint8_t kicker;
+    uint8_t config;
+    uint8_t param;
 } Pacote;
 #pragma pack(pop)
 
-const uint8_t id = 5;
+typedef struct {
+    uint32_t id;          // ID do robô
+} Info;
+
+Info info;
+
+volatile uint8_t id = -1;
 volatile float vx = 0;
 volatile float vy = 0;
 volatile float vang = 0;
 volatile uint8_t kicker = 0;
+volatile uint8_t config = 0;
+volatile uint8_t param = 0;
 
 
 uint8_t addr[5] = {'C', 'E', 'R', 'B', 'R'};
@@ -167,6 +179,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             vy = 0;
             vang = 0;
             kicker = 0;
+            config = 0;
+            param = 0;
         }
         else
         {
@@ -246,6 +260,97 @@ void soft_start_motor(int motor, float pwm_alvo, float passo) {
 
     acionar_motor(motor, *pwm_atual);
 }
+
+void gravaFlash(Info *info){
+    HAL_FLASH_Unlock();
+
+    // Apaga o setor inteiro
+    FLASH_EraseInitTypeDef EraseInitStruct;
+    uint32_t SectorError = 0;
+
+    EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
+    EraseInitStruct.Sector        = FLASH_USER_SECTOR;
+    EraseInitStruct.NbSectors     = 1;
+    EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
+
+    HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
+
+    // Grava palavra por palavra (32 bits)
+    uint32_t *data = (uint32_t*)info;
+    size_t words = sizeof(Info) / 4;
+
+    for (size_t i = 0; i < words; i++) {
+        HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD,
+                          FLASH_USER_START_ADDR + i * 4,
+                          data[i]);
+    }
+
+    HAL_FLASH_Lock();
+}
+
+void leFlash(Info *info)
+{
+    Info *flashCfg = (Info*)FLASH_USER_START_ADDR;
+    *info = *flashCfg; // cópia da flash para RAM
+}
+
+void act_config(){
+	if(config == 1) {
+		id = param;
+		info.id = param;
+		gravaFlash(&info);
+	}
+	if(config == 5){
+		if(param == 0){
+			  HAL_Delay(4000);
+			  for(int i = 0; i<4; i++){
+				  acionar_motor(i+1, 1000);
+				  HAL_Delay(1000);
+				  acionar_motor(i+1, 0);
+				  HAL_Delay(1000);
+				  acionar_motor(i+1, -1000);
+				  HAL_Delay(1000);
+				  acionar_motor(i+1, 0);
+			  }
+		  }
+		  if(param == 1){
+			  HAL_Delay(4000);
+			  for(int i = 0; i<4; i++){
+				  acionar_motor(1, 100);
+				  HAL_Delay(1000);
+				  acionar_motor(1, 0);
+				  acionar_motor(2, 100);
+				  HAL_Delay(1000);
+				  acionar_motor(2, 0);
+				  acionar_motor(3, 100);
+				  HAL_Delay(1000);
+				  acionar_motor(3, 0);
+				  acionar_motor(4, 100);
+				  HAL_Delay(1000);
+				  acionar_motor(4, 0);
+			  }
+		  }
+		  if(param == 2){
+			  for(int i = 0; i<11; i++){
+				  acionar_motor(1, i*10);
+				  acionar_motor(2, i*10);
+				  acionar_motor(3, i*10);
+				  acionar_motor(4, i*10);
+				  HAL_Delay(2000);
+			  }
+			  for(int i = 0; i<11; i++){
+				  acionar_motor(1, -i*10);
+				  acionar_motor(2, -i*10);
+				  acionar_motor(3, -i*10);
+				  acionar_motor(4, -i*10);
+				  HAL_Delay(2000);
+			  }
+		  }
+	}
+}
+
+
+
 /* USER CODE END 0 */
 
 /**
@@ -311,6 +416,8 @@ int main(void)
   	  	    {-sin(a4), cos(a4), R}
   	  	  };
   HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+  leFlash(&info);
+  id = info.id;
   //HAL_UART_Transmit(&huart2, (uint8_t*)"Iniciado!", strlen("Iniciado!"), 100);
   /* USER CODE END 2 */
 
@@ -346,6 +453,9 @@ int main(void)
   pacote_recebido.Vang = 0;
   pacote_recebido.id = id;
   pacote_recebido.kicker = 0;
+  pacote_recebido.config = 0;
+  pacote_recebido.param = 0;
+
 
   // ---- Comunicação via rádio ----
 	if(nrf24_data_available()) {
@@ -358,6 +468,8 @@ int main(void)
 			vy = pacote_recebido.Vy;
 			vang = pacote_recebido.Vang;
 			kicker = pacote_recebido.kicker;
+			config = pacote_recebido.config;
+			param = pacote_recebido.param;
 
 			radio_timeout = 1;
 			HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
@@ -369,53 +481,8 @@ int main(void)
 		radio_timeout = 0;
 		HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
 	}
-  // ---- Testes especiais (kicker) ----
-  if(kicker  > 8 && kicker < 12){
-	  HAL_Delay(4000);
-	  for(int i = 0; i<4; i++){
-		  acionar_motor(i+1, 1000);
-		  HAL_Delay(1000);
-		  acionar_motor(i+1, 0);
-		  HAL_Delay(1000);
-		  acionar_motor(i+1, -1000);
-		  HAL_Delay(1000);
-		  acionar_motor(i+1, 0);
-	  }
-	  continue;
-  }
-  if(kicker  > 14 && kicker < 16){
-	  HAL_Delay(4000);
-	  for(int i = 0; i<4; i++){
-		  acionar_motor(1, 100);
-		  HAL_Delay(1000);
-		  acionar_motor(1, 0);
-		  acionar_motor(2, 100);
-		  HAL_Delay(1000);
-		  acionar_motor(2, 0);
-		  acionar_motor(3, 100);
-		  HAL_Delay(1000);
-		  acionar_motor(3, 0);
-		  acionar_motor(4, 100);
-		  HAL_Delay(1000);
-		  acionar_motor(4, 0);
-	  }
-	  continue;
-  }
-  if(kicker > 18 && kicker < 22){
-	  for(int i = 0; i<11; i++){
-		  acionar_motor(1, i*10);
-		  acionar_motor(2, i*10);
-		  acionar_motor(3, i*10);
-		  acionar_motor(4, i*10);
-		  HAL_Delay(2000);
-	  }
-	  for(int i = 0; i<11; i++){
-		  acionar_motor(1, -i*10);
-		  acionar_motor(2, -i*10);
-		  acionar_motor(3, -i*10);
-		  acionar_motor(4, -i*10);
-		  HAL_Delay(2000);
-	  }
+  if (config != 0) {
+	  act_config();
 	  continue;
   }
 
