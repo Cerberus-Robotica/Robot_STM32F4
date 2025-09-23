@@ -47,8 +47,8 @@ volatile float vang = 0;
 volatile uint8_t kicker = 0;
 
 
-uint8_t addr[5] = {'A', 'S', 'U', 'R', 'T'};
-uint8_t channel = 123;
+uint8_t addr[5] = {'C', 'E', 'R', 'B', 'R'};
+uint8_t channel = 83;
 uint8_t pld_size = sizeof(Pacote);
 volatile uint8_t radio_timeout = 0;
 
@@ -318,6 +318,28 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET) {
+		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+		  HAL_Delay(2000);
+		  for (int i = 0; i < id ; i++) {
+			  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+			  HAL_Delay(1000);
+			  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
+			  HAL_Delay(1000);
+		  }
+		  if (id == -1) {
+			  for (int i = 0; i<3; i++) {
+				  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+				  HAL_Delay(500);
+				  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
+				  HAL_Delay(500);
+			  }
+		  }
+		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+		  HAL_Delay(2000);
+	  }
+
+
   // Inicializa pacote com valores padrão
   pacote_recebido.Vx = 0;
   pacote_recebido.Vy = 0;
@@ -326,28 +348,27 @@ int main(void)
   pacote_recebido.kicker = 0;
 
   // ---- Comunicação via rádio ----
-  if(nrf24_data_available()) {
-	  nrf24_receive(rx_buffer, pld_size);
-	  memcpy(&pacote_recebido, rx_buffer, sizeof(Pacote));
+	if(nrf24_data_available()) {
+		nrf24_receive(rx_buffer, pld_size);
+		memcpy(&pacote_recebido, rx_buffer, sizeof(Pacote));
 
-	  if(pacote_recebido.id == id){
+		if(pacote_recebido.id == id){
 		  // Atualiza variáveis globais
-		  vx = pacote_recebido.Vx;
-		  vy = pacote_recebido.Vy;
-		  vang = pacote_recebido.Vang;
-		  kicker = pacote_recebido.kicker;
+			vx = pacote_recebido.Vx;
+			vy = pacote_recebido.Vy;
+			vang = pacote_recebido.Vang;
+			kicker = pacote_recebido.kicker;
 
-		  radio_timeout = 1;
-		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
-	  } else {
-		  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
-		  radio_timeout = 0;
-	  }
-  } else {
-	  radio_timeout = 0;
-	  HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
-  }
-
+			radio_timeout = 1;
+			HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_RESET);
+		} else {
+			HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+			radio_timeout = 0;
+		}
+	} else {
+		radio_timeout = 0;
+		HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
+	}
   // ---- Testes especiais (kicker) ----
   if(kicker  > 8 && kicker < 12){
 	  HAL_Delay(4000);
@@ -399,6 +420,9 @@ int main(void)
   }
 
   // ---- Cinemática do robô ----
+  if (vx > 0.71) vx = 0.71;
+  if (vy > 0.71) vy = 0.71;
+
   float velocidade_angular[4];
   for (int i = 0; i < 4; i++) {
 	  velocidade_angular[i] = (1.0f / Rr) * (J[i][0] * vx + J[i][1] * vy + J[i][2] * vang);
@@ -835,6 +859,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_AZUL_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : Button_Pin */
+  GPIO_InitStruct.Pin = Button_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(Button_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SPI_CSN_Pin SPI_CE_Pin */
   GPIO_InitStruct.Pin = SPI_CSN_Pin|SPI_CE_Pin;
