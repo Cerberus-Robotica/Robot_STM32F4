@@ -2,9 +2,9 @@
 ../Core/Src/main.c:172:6:HAL_TIM_PeriodElapsedCallback	3
 ../Core/Src/main.c:193:6:acionar_motor	17
 ../Core/Src/main.c:247:6:soft_start_motor	4
-../Core/Src/main.c:264:6:gravaFlash	1
-../Core/Src/main.c:291:6:leFlash	1
-../Core/Src/main.c:297:6:act_config	10
-../Core/Src/main.c:577:6:SystemClock_Config	3
-../Core/Src/main.c:360:5:main	41
-../Core/Src/main.c:985:6:Error_Handler	1
+../Core/Src/main.c:264:6:gravaFlash	2
+../Core/Src/main.c:307:6:leFlash	1
+../Core/Src/main.c:314:6:act_config	10
+../Core/Src/main.c:595:6:SystemClock_Config	3
+../Core/Src/main.c:379:5:main	42
+../Core/Src/main.c:1003:6:Error_Handler	1

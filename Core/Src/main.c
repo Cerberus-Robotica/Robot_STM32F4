@@ -262,36 +262,53 @@ void soft_start_motor(int motor, float pwm_alvo, float passo) {
 }
 
 void gravaFlash(Info *info){
+    HAL_StatusTypeDef status;
     HAL_FLASH_Unlock();
 
     // Apaga o setor inteiro
     FLASH_EraseInitTypeDef EraseInitStruct;
     uint32_t SectorError = 0;
 
-    EraseInitStruct.TypeErase     = FLASH_TYPEERASE_SECTORS;
-    EraseInitStruct.Sector        = FLASH_USER_SECTOR;
-    EraseInitStruct.NbSectors     = 1;
-    EraseInitStruct.VoltageRange  = FLASH_VOLTAGE_RANGE_3;
+    EraseInitStruct.TypeErase    = FLASH_TYPEERASE_SECTORS;
+    EraseInitStruct.Sector       = FLASH_USER_SECTOR;
+    EraseInitStruct.NbSectors    = 1;
+    EraseInitStruct.VoltageRange = FLASH_VOLTAGE_RANGE_3;
 
-    HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
+    status = HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError);
+    if (status != HAL_OK) {
+        // opcional: tratar/indicar erro (debug)
+        HAL_FLASH_Lock();
+        return;
+    }
 
-    // Grava palavra por palavra (32 bits)
-    uint32_t *data = (uint32_t*)info;
-    size_t words = sizeof(Info) / 4;
+    // Prepara buffer de palavras 32-bit com padding
+    size_t bytes = sizeof(Info);
+    size_t words = (bytes + 3) / 4; // arredonda para cima
+    uint32_t buf[ ( (sizeof(Info) + 3) / 4 ) ];
+    // inicializa com 0xFFFFFFFF (valor de flash apagada)
+    for (size_t i = 0; i < words; ++i) buf[i] = 0xFFFFFFFFu;
 
-    for (size_t i = 0; i < words; i++) {
-        HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD,
-                          FLASH_USER_START_ADDR + i * 4,
-                          data[i]);
+    // copia bytes da struct para o buffer
+    memcpy((uint8_t*)buf, (uint8_t*)info, bytes);
+
+    // grava palavra a palavra
+    for (size_t i = 0; i < words; ++i) {
+        status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD,
+                                   FLASH_USER_START_ADDR + i * 4,
+                                   buf[i]);
+        if (status != HAL_OK) {
+            // tratar erro: opcionalmente ler __HAL_FLASH_GET_FLAG(...) para debug
+            break;
+        }
     }
 
     HAL_FLASH_Lock();
 }
-
 void leFlash(Info *info)
 {
-    Info *flashCfg = (Info*)FLASH_USER_START_ADDR;
-    *info = *flashCfg; // cópia da flash para RAM
+    // Copia bytes diretamente da flash (não é necessário fazer cast para pointer de palavra)
+    const void *flashPtr = (const void*)FLASH_USER_START_ADDR;
+    memcpy(info, flashPtr, sizeof(Info));
 }
 
 void act_config(){
@@ -418,15 +435,14 @@ int main(void)
   	  	    {-sin(a4), cos(a4), R}
   	  	  };
   HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
-  //leFlash(&info);
-  info.id = -1;
+  leFlash(&info);
   if(info.id == 0xFF || info.id > 15 || info.id == 0xFF) {
 	  Info new_info;
 	  new_info.id = -1;
-	  //gravaFlash(&new_info);
-	  //leFlash(&info);
+	  gravaFlash(&new_info);
+	  leFlash(&info);
   }
-  id = -1;
+  id = info.id;
   //HAL_UART_Transmit(&huart2, (uint8_t*)"Iniciado!", strlen("Iniciado!"), 100);
   /* USER CODE END 2 */
 
