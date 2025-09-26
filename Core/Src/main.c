@@ -420,7 +420,7 @@ int main(void)
   HAL_GPIO_WritePin(LED_AZUL_GPIO_Port, LED_AZUL_Pin, GPIO_PIN_SET);
   //leFlash(&info);
   info.id = -1;
-  if(info.id == 0xFF || info.id > 15 || info.id < -1 || info.id == 0xFF) {
+  if(info.id == 0xFF || info.id > 15 || info.id == 0xFF) {
 	  Info new_info;
 	  new_info.id = -1;
 	  //gravaFlash(&new_info);
