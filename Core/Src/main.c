@@ -363,9 +363,45 @@ void act_config(){
 				  HAL_Delay(2000);
 			  }
 		  }
-		  config = 0;
-		  param = 0;
+		  if(param == 3){
+		  			  for(int i = 0; i<1; i++){
+		  				  acionar_motor(1, 50);
+		  				  acionar_motor(2, -50);
+		  				  acionar_motor(3, -50);
+		  				  acionar_motor(4, 50);
+		  				  HAL_Delay(2000);
+		  			  }
+		  			  for(int i = 0; i<1; i++){
+		  				  acionar_motor(1, -50);
+		  				  acionar_motor(2, 50);
+		  				  acionar_motor(3, 50);
+		  				  acionar_motor(4, -50);
+		  				  HAL_Delay(2000);
+		  			  }
+		  			  for(int i = 0; i<1; i++){
+		  				  acionar_motor(1, -50);
+		  				  acionar_motor(2, -50);
+		  				  acionar_motor(3, 50);
+		  				  acionar_motor(4, 50);
+		  				  HAL_Delay(2000);
+		  			  }
+		  			  for(int i = 0; i<1; i++){
+		  				  acionar_motor(1, 50);
+		  				  acionar_motor(2, 50);
+		  				  acionar_motor(3, -50);
+		  				  acionar_motor(4, -50);
+		  				  HAL_Delay(2000);
+		  			  }
+		  			acionar_motor(1, 0);
+		  			acionar_motor(2, 0);
+		  			acionar_motor(3, 0);
+		  			acionar_motor(4, 0);
+		  			HAL_Delay(4000);
+
+		  		  }
 	}
+	config = 0;
+	param = 0;
 }
 
 
@@ -516,6 +552,8 @@ int main(void)
   // ---- Cinemática do robô ----
   if (vx > 0.71) vx = 0.71;
   if (vy > 0.71) vy = 0.71;
+  if (vx < -0.71) vx = -0.71;
+  if (vy < -0.71) vy = -0.71;
 
   float velocidade_angular[4];
   for (int i = 0; i < 4; i++) {
@@ -555,6 +593,7 @@ int main(void)
   }
 
   // Aplicar nos motores
+
   acionar_motor(1, 100.0f*velocidade_angular[0]/velocidade_maxima_motor);
   acionar_motor(2, 100.0f*velocidade_angular[1]/velocidade_maxima_motor);
   acionar_motor(3, 100.0f*velocidade_angular[2]/velocidade_maxima_motor);

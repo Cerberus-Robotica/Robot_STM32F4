@@ -5,6 +5,6 @@
 ../Core/Src/main.c:264:6:gravaFlash	40	static
 ../Core/Src/main.c:307:6:leFlash	0	static
 ../Core/Src/main.c:314:6:act_config	24	static
-../Core/Src/main.c:595:6:SystemClock_Config	88	static,ignoring_inline_asm
-../Core/Src/main.c:379:5:main	144	dynamic,ignoring_inline_asm
-../Core/Src/main.c:1003:6:Error_Handler	0	static,ignoring_inline_asm
+../Core/Src/main.c:634:6:SystemClock_Config	88	static,ignoring_inline_asm
+../Core/Src/main.c:415:5:main	144	dynamic,ignoring_inline_asm
+../Core/Src/main.c:1042:6:Error_Handler	0	static,ignoring_inline_asm
